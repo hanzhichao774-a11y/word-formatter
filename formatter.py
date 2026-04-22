@@ -469,11 +469,26 @@ _ROLE_TO_STYLE = {
 }
 
 
+def _strip_heading_numbering(doc):
+    """Remove numbering definitions from Heading styles at the style level."""
+    for name in ("Title", "Heading 1", "Heading 2", "Heading 3"):
+        try:
+            style_elem = doc.styles[name].element
+        except KeyError:
+            continue
+        style_pPr = style_elem.find(qn("w:pPr"))
+        if style_pPr is None:
+            continue
+        numPr = style_pPr.find(qn("w:numPr"))
+        if numPr is not None:
+            style_pPr.remove(numPr)
+
+
 def _apply_word_style(para, role, doc):
     """Set the Word built-in style so that TOC and navigation pane work correctly.
 
-    After assigning the style, strip any inherited numbering (numPr) and
-    indentation so they don't conflict with our explicit formatting.
+    Explicitly disables numbering (numId=0) to prevent duplication with
+    already-numbered text, and clears inherited indentation.
     """
     style_name = _ROLE_TO_STYLE.get(role)
     if not style_name:
@@ -483,12 +498,14 @@ def _apply_word_style(para, role, doc):
     except KeyError:
         return
 
-    pPr = para._element.find(qn("w:pPr"))
-    if pPr is None:
-        return
+    pPr = para._element.get_or_add_pPr()
+
     numPr = pPr.find(qn("w:numPr"))
     if numPr is not None:
         pPr.remove(numPr)
+    no_num = parse_xml(f'<w:numPr {nsdecls("w")}><w:numId w:val="0"/></w:numPr>')
+    pPr.insert(0, no_num)
+
     ind = pPr.find(qn("w:ind"))
     if ind is not None:
         pPr.remove(ind)
@@ -498,6 +515,8 @@ def format_document(input_path, output_path, template_key="通用论文", custom
     """Main entry: format a Word document according to the chosen template."""
     doc = Document(input_path)
     tpl = custom_template if custom_template else TEMPLATES[template_key]
+
+    _strip_heading_numbering(doc)
 
     total = len(doc.paragraphs)
     content_start = find_content_start(doc.paragraphs)
