@@ -364,7 +364,10 @@ def apply_paragraph_format(para, style_cfg):
 
     ls = style_cfg.get("line_spacing")
     if ls is not None:
-        if isinstance(ls, Pt.__class__) or (hasattr(ls, 'pt') and not isinstance(ls, (int, float))):
+        if isinstance(ls, (int, float)) and ls > 100:
+            pf.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+            pf.line_spacing = ls
+        elif hasattr(ls, 'pt') and not isinstance(ls, (int, float)):
             pf.line_spacing_rule = WD_LINE_SPACING.EXACTLY
             pf.line_spacing = ls
         else:
@@ -599,6 +602,8 @@ _ROLE_CN = {
 def _format_line_spacing(ls):
     if ls is None:
         return "-"
+    if isinstance(ls, (int, float)) and ls > 100:
+        return f"固定值{ls / 12700:.0f}磅"
     if hasattr(ls, "pt") and not isinstance(ls, (int, float)):
         return f"固定值{ls.pt}磅"
     return f"{ls}倍"
@@ -615,6 +620,17 @@ def _build_report(tpl, changes):
         if not cfg:
             continue
         size_pt = cfg["size"].pt if hasattr(cfg["size"], "pt") else cfg["size"]
+        if isinstance(size_pt, (int, float)) and size_pt > 100:
+            size_pt = size_pt / 12700
+
+        indent_desc = ""
+        if cfg.get("hanging_indent", 0) > 0:
+            indent_desc = f"悬挂{cfg['hanging_indent']}字符"
+        elif cfg.get("first_line_indent", 0) > 0:
+            indent_desc = f"首行{cfg['first_line_indent']}字符"
+        else:
+            indent_desc = "无"
+
         report[role] = {
             "label": _ROLE_CN.get(role, role),
             "count": count,
@@ -623,5 +639,6 @@ def _build_report(tpl, changes):
             "bold": cfg.get("bold", False),
             "alignment": _ALIGN_TO_CN.get(cfg.get("alignment"), "左对齐"),
             "line_spacing": _format_line_spacing(cfg.get("line_spacing")),
+            "indent": indent_desc,
         }
     return report
