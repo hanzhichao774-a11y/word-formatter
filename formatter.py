@@ -347,7 +347,12 @@ def set_font(run, font_cn, font_en, size, bold=False):
     run.font.size = size
     run.font.bold = bold
     run.font.name = font_en
-    run.element.rPr.rFonts.set(qn("w:eastAsia"), font_cn)
+    rPr = run.element.get_or_add_rPr()
+    rFonts = rPr.find(qn("w:rFonts"))
+    if rFonts is None:
+        rFonts = parse_xml(f'<w:rFonts {nsdecls("w")}/>')
+        rPr.insert(0, rFonts)
+    rFonts.set(qn("w:eastAsia"), font_cn)
 
 
 def apply_paragraph_format(para, style_cfg):
