@@ -470,14 +470,28 @@ _ROLE_TO_STYLE = {
 
 
 def _apply_word_style(para, role, doc):
-    """Set the Word built-in style so that TOC and navigation pane work correctly."""
+    """Set the Word built-in style so that TOC and navigation pane work correctly.
+
+    After assigning the style, strip any inherited numbering (numPr) and
+    indentation so they don't conflict with our explicit formatting.
+    """
     style_name = _ROLE_TO_STYLE.get(role)
     if not style_name:
         return
     try:
         para.style = doc.styles[style_name]
     except KeyError:
-        pass
+        return
+
+    pPr = para._element.find(qn("w:pPr"))
+    if pPr is None:
+        return
+    numPr = pPr.find(qn("w:numPr"))
+    if numPr is not None:
+        pPr.remove(numPr)
+    ind = pPr.find(qn("w:ind"))
+    if ind is not None:
+        pPr.remove(ind)
 
 
 def format_document(input_path, output_path, template_key="通用论文", custom_template=None):
