@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>排版侠 — 一键搞定文档排版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0b;
+  --surface: #141416;
+  --surface-hover: #1c1c20;
+  --border: #2a2a30;
+  --border-active: #f97316;
+  --text: #e8e8ed;
+  --text-dim: #8888a0;
+  --accent: #f97316;
+  --accent-glow: rgba(249, 115, 22, 0.15);
+  --accent-hover: #fb923c;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans SC', system-ui, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.grain {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+.glow-orb {
+  position: fixed; width: 600px; height: 600px; border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+  top: -200px; right: -200px;
+  animation: float 8s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-40px, 30px); }
+}
+
+.container {
+  position: relative; z-index: 1;
+  max-width: 720px; margin: 0 auto;
+  padding: 60px 24px 80px;
+}
+
+header {
+  text-align: center; margin-bottom: 56px;
+}
+
+.logo {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 14px; font-weight: 500; color: var(--accent);
+  letter-spacing: 3px; text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.logo-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+h1 {
+  font-size: 42px; font-weight: 900; line-height: 1.2;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  color: var(--text-dim); font-size: 16px; margin-top: 12px;
+  font-weight: 300; line-height: 1.6;
+}
+
+.step-label {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px;
+  font-size: 13px; font-weight: 500;
+  color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase;
+}
+
+.step-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent);
+  color: #000; font-weight: 700; font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.section { margin-bottom: 40px; }
+
+.template-grid {
+  display: grid; grid-template-columns: 1fr; gap: 10px;
+}
+
+.template-card {
+  position: relative;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex; align-items: center; gap: 16px;
+}
+
+.template-card:hover {
+  background: var(--surface-hover);
+  border-color: #444;
+}
+
+.template-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  box-shadow: 0 0 0 1px var(--accent), 0 4px 20px var(--accent-glow);
+}
+
+.template-card input[type="radio"] { display: none; }
+
+.radio-dot {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+
+.template-card.selected .radio-dot {
+  border-color: var(--accent);
+}
+
+.radio-dot::after {
+  content: ''; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--accent);
+  transform: scale(0); transition: transform 0.2s;
+}
+
+.template-card.selected .radio-dot::after {
+  transform: scale(1);
+}
+
+.template-info h3 {
+  font-size: 15px; font-weight: 600; margin-bottom: 3px;
+}
+
+.template-info p {
+  font-size: 12px; color: var(--text-dim); font-weight: 300;
+}
+
+.dropzone {
+  position: relative;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 48px 24px;
+  text-align: center;
+  transition: all 0.25s;
+  cursor: pointer;
+  background: var(--surface);
+}
+
+.dropzone:hover, .dropzone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.dropzone-icon {
+  font-size: 40px; margin-bottom: 12px; display: block;
+  filter: grayscale(1) brightness(1.5);
+  transition: filter 0.25s;
+}
+
+.dropzone:hover .dropzone-icon, .dropzone.dragover .dropzone-icon {
+  filter: none;
+}
+
+.dropzone-text {
+  font-size: 15px; color: var(--text-dim); font-weight: 400;
+}
+
+.dropzone-text strong { color: var(--accent); font-weight: 500; }
+
+.dropzone-hint {
+  font-size: 12px; color: var(--text-dim); margin-top: 8px; opacity: 0.6;
+}
+
+.file-chosen {
+  display: none; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-top: 12px;
+}
+
+.file-chosen.show { display: flex; }
+
+.file-icon { font-size: 24px; }
+
+.file-meta { flex: 1; }
+.file-meta .name { font-size: 14px; font-weight: 500; word-break: break-all; }
+.file-meta .size { font-size: 12px; color: var(--text-dim); }
+
+.file-remove {
+  background: none; border: none; color: var(--text-dim);
+  cursor: pointer; font-size: 18px; padding: 4px;
+  transition: color 0.15s;
+}
+
+.file-remove:hover { color: var(--danger); }
+
+.btn-format {
+  width: 100%;
+  padding: 16px;
+  border: none; border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #000;
+  font-family: inherit;
+  font-size: 16px; font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-format:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px var(--accent-glow);
+}
+
+.btn-format:disabled {
+  opacity: 0.35; cursor: not-allowed;
+}
+
+.btn-format .spinner {
+  display: none;
+  width: 18px; height: 18px;
+  border: 2.5px solid rgba(0,0,0,0.2);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-right: 8px;
+}
+
+.btn-format.loading .spinner { display: inline-block; }
+.btn-format.loading .btn-text { opacity: 0.7; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.result-card {
+  display: none;
+  margin-top: 32px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1.5px solid var(--success);
+  border-radius: var(--radius);
+  animation: slideUp 0.4s ease;
+}
+
+.result-card.show { display: block; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.result-header {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 17px; font-weight: 700;
+  color: var(--success);
+  margin-bottom: 20px;
+}
+
+.stats-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin-bottom: 24px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 14px 8px;
+  background: rgba(255,255,255,0.03);
+  border-radius: var(--radius-sm);
+}
+
+.stat-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 26px; font-weight: 600;
+  color: var(--text);
+}
+
+.stat-label {
+  font-size: 11px; color: var(--text-dim);
+  margin-top: 4px; letter-spacing: 0.5px;
+}
+
+.btn-download {
+  display: inline-flex; align-items: center; gap: 8px;
+  width: 100%;
+  justify-content: center;
+  padding: 14px;
+  border: none; border-radius: var(--radius-sm);
+  background: var(--success);
+  color: #000;
+  font-family: inherit;
+  font-size: 15px; font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.btn-download:hover {
+  background: #4ade80;
+  transform: translateY(-1px);
+}
+
+.error-msg {
+  display: none;
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 14px;
+  animation: slideUp 0.3s ease;
+}
+
+.error-msg.show { display: block; }
+
+footer {
+  text-align: center;
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 520px) {
+  h1 { font-size: 28px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .container { padding: 36px 16px 60px; }
+}
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+<div class="glow-orb"></div>
+
+<div class="container">
+  <header>
+    <div class="logo"><span class="logo-dot"></span> 排版侠</div>
+    <h1>上传文档，一键排版</h1>
+    <p class="subtitle">支持论文、期刊、商务文档，告别手动调格式的痛苦</p>
+  </header>
+
+  <div class="section">
+    <div class="step-label"><span class="step-num">1</span> 选择排版模板</div>
+    <div class="template-grid" id="templateGrid">
+      {% for key, tpl in templates.items() %}
+      <label class="template-card {% if loop.first %}selected{% endif %}" data-key="{{ key }}">
+        <input type="radio" name="template" value="{{ key }}" {% if loop.first %}checked{% endif %}>
+        <div class="radio-dot"></div>
+        <div class="template-info">
+          <h3>{{ tpl.name }}</h3>
+          <p>{{ tpl.description }}</p>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="step-label"><span class="step-num">2</span> 上传 Word 文档</div>
+    <div class="dropzone" id="dropzone">
+      <span class="dropzone-icon">📄</span>
+      <div class="dropzone-text">拖拽文件到这里，或 <strong>点击选择</strong></div>
+      <div class="dropzone-hint">仅支持 .docx 格式，最大 30MB</div>
+      <input type="file" id="fileInput" accept=".docx" hidden>
+    </div>
+    <div class="file-chosen" id="fileChosen">
+      <span class="file-icon">📝</span>
+      <div class="file-meta">
+        <div class="name" id="fileName"></div>
+        <div class="size" id="fileSize"></div>
+      </div>
+      <button class="file-remove" id="fileRemove" title="移除">&times;</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="step-label"><span class="step-num">3</span> 开始排版</div>
+    <button class="btn-format" id="btnFormat" disabled>
+      <span class="spinner"></span>
+      <span class="btn-text">开始一键排版</span>
+    </button>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+
+  <div class="result-card" id="resultCard">
+    <div class="result-header">✅ 排版完成</div>
+    <div class="stats-grid" id="statsGrid"></div>
+    <a class="btn-download" id="btnDownload" href="#">
+      ⬇ 下载排版后的文档
+    </a>
+  </div>
+
+  <footer>排版侠 MVP &mdash; 让排版不再是痛苦</footer>
+</div>
+
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const fileChosen = document.getElementById('fileChosen');
+const fileName = document.getElementById('fileName');
+const fileSize = document.getElementById('fileSize');
+const fileRemove = document.getElementById('fileRemove');
+const btnFormat = document.getElementById('btnFormat');
+const errorMsg = document.getElementById('errorMsg');
+const resultCard = document.getElementById('resultCard');
+const statsGrid = document.getElementById('statsGrid');
+const btnDownload = document.getElementById('btnDownload');
+
+let selectedFile = null;
+
+document.querySelectorAll('.template-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    card.querySelector('input').checked = true;
+  });
+});
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) handleFile(fileInput.files[0]);
+});
+
+function handleFile(file) {
+  if (!file.name.endsWith('.docx')) {
+    showError('请上传 .docx 格式的文件');
+    return;
+  }
+  selectedFile = file;
+  fileName.textContent = file.name;
+  fileSize.textContent = formatBytes(file.size);
+  fileChosen.classList.add('show');
+  dropzone.style.display = 'none';
+  btnFormat.disabled = false;
+  hideError();
+  resultCard.classList.remove('show');
+}
+
+fileRemove.addEventListener('click', () => {
+  selectedFile = null;
+  fileInput.value = '';
+  fileChosen.classList.remove('show');
+  dropzone.style.display = '';
+  btnFormat.disabled = true;
+});
+
+btnFormat.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  const tpl = document.querySelector('input[name="template"]:checked').value;
+
+  btnFormat.disabled = true;
+  btnFormat.classList.add('loading');
+  btnFormat.querySelector('.btn-text').textContent = '排版中…';
+  hideError();
+  resultCard.classList.remove('show');
+
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+  formData.append('template', tpl);
+
+  try {
+    const res = await fetch('/format', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showError(data.error || '未知错误');
+      return;
+    }
+
+    const c = data.changes;
+    const processed = (c.title||0) + (c.heading1||0) + (c.heading2||0) + (c.heading3||0) + (c.body||0);
+    const skipped = c.skipped || 0;
+    statsGrid.innerHTML = `
+      <div class="stat-item"><div class="stat-num">${data.total_paragraphs}</div><div class="stat-label">总段落数</div></div>
+      <div class="stat-item"><div class="stat-num">${skipped}</div><div class="stat-label">前置页保留</div></div>
+      <div class="stat-item"><div class="stat-num">${processed}</div><div class="stat-label">已格式化</div></div>
+    `;
+
+    btnDownload.href = `/download/${data.file_id}/${encodeURIComponent(data.output_name)}`;
+    resultCard.classList.add('show');
+  } catch (e) {
+    showError('网络错误，请重试');
+  } finally {
+    btnFormat.disabled = false;
+    btnFormat.classList.remove('loading');
+    btnFormat.querySelector('.btn-text').textContent = '开始一键排版';
+  }
+});
+
+function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('show'); }
+function hideError() { errorMsg.classList.remove('show'); }
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+</script>
+</body>
+</html>

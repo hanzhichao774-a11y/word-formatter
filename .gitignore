@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Uploads & outputs (runtime data)
+uploads/
+outputs/
+
+# Test artifacts
+test_*.docx
+create_test_doc.py
+create_thesis_test.py
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
