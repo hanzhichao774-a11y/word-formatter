@@ -283,8 +283,13 @@ def apply_paragraph_format(para, style_cfg):
     pf.space_before = style_cfg.get("space_before", Pt(0))
     pf.space_after = style_cfg.get("space_after", Pt(0))
 
-    if "line_spacing" in style_cfg:
-        pf.line_spacing = style_cfg["line_spacing"]
+    ls = style_cfg.get("line_spacing")
+    if ls is not None:
+        if isinstance(ls, Pt.__class__) or (hasattr(ls, 'pt') and not isinstance(ls, (int, float))):
+            pf.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+            pf.line_spacing = ls
+        else:
+            pf.line_spacing = ls
 
     if style_cfg.get("first_line_indent", 0) > 0:
         pf.first_line_indent = Pt(style_cfg["size"].pt * style_cfg["first_line_indent"])
@@ -368,10 +373,10 @@ def add_page_numbers(doc, size):
             r.font.size = size
 
 
-def format_document(input_path, output_path, template_key="通用论文"):
+def format_document(input_path, output_path, template_key="通用论文", custom_template=None):
     """Main entry: format a Word document according to the chosen template."""
     doc = Document(input_path)
-    tpl = TEMPLATES[template_key]
+    tpl = custom_template if custom_template else TEMPLATES[template_key]
 
     total = len(doc.paragraphs)
     content_start = find_content_start(doc.paragraphs)

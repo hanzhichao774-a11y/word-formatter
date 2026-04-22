@@ -10,6 +10,9 @@ build/
 uploads/
 outputs/
 
+# Env & secrets
+.env
+
 # Test artifacts
 test_*.docx
 create_test_doc.py
