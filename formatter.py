@@ -461,6 +461,25 @@ def add_page_numbers(doc, size):
             r.font.size = size
 
 
+_ROLE_TO_STYLE = {
+    "title": "Title",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+}
+
+
+def _apply_word_style(para, role, doc):
+    """Set the Word built-in style so that TOC and navigation pane work correctly."""
+    style_name = _ROLE_TO_STYLE.get(role)
+    if not style_name:
+        return
+    try:
+        para.style = doc.styles[style_name]
+    except KeyError:
+        pass
+
+
 def format_document(input_path, output_path, template_key="通用论文", custom_template=None):
     """Main entry: format a Word document according to the chosen template."""
     doc = Document(input_path)
@@ -504,6 +523,8 @@ def format_document(input_path, output_path, template_key="通用论文", custom
 
         if role == "empty":
             continue
+
+        _apply_word_style(para, role, doc)
 
         if role in tpl:
             apply_paragraph_format(para, tpl[role])
