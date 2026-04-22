@@ -41,7 +41,7 @@ def parse_template():
         template, raw_json = parse_template_from_docx(tmp_path)
         custom_templates[file_id] = template
         summary = {}
-        for role in ("title", "heading1", "heading2", "heading3", "body"):
+        for role in ("title", "heading1", "heading2", "heading3", "body", "caption", "reference"):
             info = raw_json.get(role)
             if info:
                 summary[role] = {

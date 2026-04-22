@@ -57,6 +57,20 @@ TEMPLATES = {
             "size": FONT_SIZE_MAP["五号"],
             "three_line": True,
         },
+        "caption": {
+            "font_cn": "宋体", "font_en": "Times New Roman",
+            "size": FONT_SIZE_MAP["五号"], "bold": False,
+            "alignment": WD_ALIGN_PARAGRAPH.CENTER,
+            "line_spacing": 1.5, "first_line_indent": 0,
+            "space_before": Pt(6), "space_after": Pt(6),
+        },
+        "reference": {
+            "font_cn": "宋体", "font_en": "Times New Roman",
+            "size": FONT_SIZE_MAP["五号"], "bold": False,
+            "alignment": WD_ALIGN_PARAGRAPH.JUSTIFY,
+            "line_spacing": 1.25, "first_line_indent": 0, "hanging_indent": 2,
+            "space_before": Pt(0), "space_after": Pt(0),
+        },
         "page_number": True,
         "header_footer_size": FONT_SIZE_MAP["小五"],
     },
@@ -100,6 +114,20 @@ TEMPLATES = {
             "font_cn": "宋体", "font_en": "Times New Roman",
             "size": FONT_SIZE_MAP["小五"],
             "three_line": True,
+        },
+        "caption": {
+            "font_cn": "宋体", "font_en": "Times New Roman",
+            "size": FONT_SIZE_MAP["五号"], "bold": False,
+            "alignment": WD_ALIGN_PARAGRAPH.CENTER,
+            "line_spacing": 1.25, "first_line_indent": 0,
+            "space_before": Pt(6), "space_after": Pt(6),
+        },
+        "reference": {
+            "font_cn": "宋体", "font_en": "Times New Roman",
+            "size": FONT_SIZE_MAP["五号"], "bold": False,
+            "alignment": WD_ALIGN_PARAGRAPH.JUSTIFY,
+            "line_spacing": 1.25, "first_line_indent": 0, "hanging_indent": 2,
+            "space_before": Pt(0), "space_after": Pt(0),
         },
         "page_number": True,
         "header_footer_size": FONT_SIZE_MAP["小五"],
@@ -145,6 +173,20 @@ TEMPLATES = {
             "size": Pt(9),
             "three_line": False,
         },
+        "caption": {
+            "font_cn": "微软雅黑", "font_en": "Arial",
+            "size": Pt(9), "bold": False,
+            "alignment": WD_ALIGN_PARAGRAPH.CENTER,
+            "line_spacing": 1.5, "first_line_indent": 0,
+            "space_before": Pt(6), "space_after": Pt(6),
+        },
+        "reference": {
+            "font_cn": "微软雅黑", "font_en": "Arial",
+            "size": Pt(9), "bold": False,
+            "alignment": WD_ALIGN_PARAGRAPH.LEFT,
+            "line_spacing": 1.5, "first_line_indent": 0, "hanging_indent": 2,
+            "space_before": Pt(0), "space_after": Pt(3),
+        },
         "page_number": True,
         "header_footer_size": Pt(9),
     },
@@ -182,6 +224,34 @@ H2_PATTERNS = [
 H3_PATTERNS = [
     r"^\d+\.\d+\.\d+[\s\u3000]+\S",
 ]
+
+CAPTION_PATTERNS = [
+    r"^图[\s\u3000]*\d",
+    r"^表[\s\u3000]*\d",
+    r"^Figure[\s\u3000]*\d",
+    r"^Table[\s\u3000]*\d",
+]
+
+REFERENCE_HEADING_RE = re.compile(r"^参[\s\u3000]*考[\s\u3000]*文[\s\u3000]*献$")
+
+_DEFAULT_CAPTION = {
+    "font_cn": "宋体", "font_en": "Times New Roman",
+    "size": FONT_SIZE_MAP["五号"], "bold": False,
+    "alignment": WD_ALIGN_PARAGRAPH.CENTER,
+    "line_spacing": 1.5,
+    "first_line_indent": 0,
+    "space_before": Pt(6), "space_after": Pt(6),
+}
+
+_DEFAULT_REFERENCE = {
+    "font_cn": "宋体", "font_en": "Times New Roman",
+    "size": FONT_SIZE_MAP["五号"], "bold": False,
+    "alignment": WD_ALIGN_PARAGRAPH.JUSTIFY,
+    "line_spacing": 1.25,
+    "first_line_indent": 0,
+    "hanging_indent": 2,
+    "space_before": Pt(0), "space_after": Pt(0),
+}
 
 
 def _is_toc_entry(text):
@@ -265,6 +335,10 @@ def detect_role(para, rel_index, total):
         if re.match(pat, text, re.IGNORECASE):
             return "heading1"
 
+    for pat in CAPTION_PATTERNS:
+        if re.match(pat, text, re.IGNORECASE):
+            return "caption"
+
     return "body"
 
 
@@ -291,10 +365,16 @@ def apply_paragraph_format(para, style_cfg):
         else:
             pf.line_spacing = ls
 
-    if style_cfg.get("first_line_indent", 0) > 0:
+    if style_cfg.get("hanging_indent", 0) > 0:
+        indent_pt = Pt(style_cfg["size"].pt * style_cfg["hanging_indent"])
+        pf.left_indent = indent_pt
+        pf.first_line_indent = Pt(-indent_pt.pt)
+    elif style_cfg.get("first_line_indent", 0) > 0:
         pf.first_line_indent = Pt(style_cfg["size"].pt * style_cfg["first_line_indent"])
+        pf.left_indent = None
     else:
         pf.first_line_indent = None
+        pf.left_indent = None
 
     for run in para.runs:
         set_font(
@@ -391,8 +471,11 @@ def format_document(input_path, output_path, template_key="通用论文", custom
 
     changes = {
         "title": 0, "heading1": 0, "heading2": 0,
-        "heading3": 0, "body": 0, "empty": 0, "skipped": 0,
+        "heading3": 0, "body": 0, "caption": 0,
+        "reference": 0, "empty": 0, "skipped": 0,
     }
+
+    in_reference_section = False
 
     for i, para in enumerate(doc.paragraphs):
         if i < content_start:
@@ -400,6 +483,15 @@ def format_document(input_path, output_path, template_key="通用论文", custom
             continue
 
         role = detect_role(para, i - content_start, total - content_start)
+
+        if role == "heading1":
+            text = para.text.strip()
+            in_reference_section = bool(REFERENCE_HEADING_RE.match(text))
+        elif role in ("heading2", "heading3"):
+            pass
+        elif in_reference_section and role == "body":
+            role = "reference"
+
         changes[role] += 1
 
         if role == "empty":
@@ -430,9 +522,12 @@ def format_document(input_path, output_path, template_key="通用论文", custom
 
     doc.save(output_path)
 
+    report = _build_report(tpl, changes)
+
     return {
         "template": tpl["name"],
         "changes": changes,
+        "report": report,
         "total_paragraphs": total,
         "content_start": content_start,
         "total_tables": len(doc.tables),
@@ -474,3 +569,54 @@ def _table_is_in_preamble(table, doc, content_start):
         if child.tag.endswith("}p"):
             para_count += 1
     return False
+
+
+_PT_TO_NAME = {v.pt: k for k, v in FONT_SIZE_MAP.items()}
+
+_ALIGN_TO_CN = {
+    WD_ALIGN_PARAGRAPH.CENTER: "居中",
+    WD_ALIGN_PARAGRAPH.LEFT: "左对齐",
+    WD_ALIGN_PARAGRAPH.RIGHT: "右对齐",
+    WD_ALIGN_PARAGRAPH.JUSTIFY: "两端对齐",
+}
+
+_ROLE_CN = {
+    "title": "题目",
+    "heading1": "一级标题",
+    "heading2": "二级标题",
+    "heading3": "三级标题",
+    "body": "正文",
+    "caption": "图表标题",
+    "reference": "参考文献",
+}
+
+
+def _format_line_spacing(ls):
+    if ls is None:
+        return "-"
+    if hasattr(ls, "pt") and not isinstance(ls, (int, float)):
+        return f"固定值{ls.pt}磅"
+    return f"{ls}倍"
+
+
+def _build_report(tpl, changes):
+    """Build a human-readable report dict summarising the format applied to each role."""
+    report = {}
+    for role in ("title", "heading1", "heading2", "heading3", "body", "caption", "reference"):
+        count = changes.get(role, 0)
+        if count == 0:
+            continue
+        cfg = tpl.get(role)
+        if not cfg:
+            continue
+        size_pt = cfg["size"].pt if hasattr(cfg["size"], "pt") else cfg["size"]
+        report[role] = {
+            "label": _ROLE_CN.get(role, role),
+            "count": count,
+            "font": cfg.get("font_cn", ""),
+            "size": _PT_TO_NAME.get(size_pt, f"{size_pt}pt"),
+            "bold": cfg.get("bold", False),
+            "alignment": _ALIGN_TO_CN.get(cfg.get("alignment"), "左对齐"),
+            "line_spacing": _format_line_spacing(cfg.get("line_spacing")),
+        }
+    return report

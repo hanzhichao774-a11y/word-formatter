@@ -21,9 +21,9 @@ ALIGNMENT_MAP = {
 }
 
 SYSTEM_PROMPT = """你是一个排版规范解析器。用户会提供一份Word文档中的排版格式要求文本。
-请从中提取以下5个元素的排版参数，返回严格的JSON格式。
+请从中提取以下7个元素的排版参数，返回严格的JSON格式。
 
-需要提取的元素：title（题目）、heading1（一级标题）、heading2（二级标题）、heading3（三级标题）、body（正文）
+需要提取的元素：title（题目）、heading1（一级标题）、heading2（二级标题）、heading3（三级标题）、body（正文）、caption（图表标题，如"图 1-1"、"表 2-3"的格式要求）、reference（参考文献条目）
 
 每个元素需要提取以下字段：
 - font_cn: 中文字体名（如"黑体"、"宋体"、"楷体"、"仿宋"、"微软雅黑"）
@@ -35,6 +35,7 @@ SYSTEM_PROMPT = """你是一个排版规范解析器。用户会提供一份Word
 - space_before: 段前间距（磅数，如6、12、0）
 - space_after: 段后间距（磅数，如6、12、0）
 - first_line_indent: 首行缩进字符数（如2、0），如果是左边缩进也算
+- hanging_indent: 悬挂缩进字符数（如2、0），仅reference可能用到
 
 同时提取页面设置（如有）：
 - margins: 页边距 { top, bottom, left, right }（厘米）
@@ -49,6 +50,8 @@ SYSTEM_PROMPT = """你是一个排版规范解析器。用户会提供一份Word
   "heading2": { ... },
   "heading3": { ... },
   "body": { ... },
+  "caption": { ... },
+  "reference": { ... },
   "margins": { "top": 2.54, "bottom": 2.54, "left": 3.17, "right": 3.17 }
 }"""
 
@@ -73,7 +76,8 @@ def call_kimi(text):
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"请从以下排版格式要求中提取参数：\n\n{text}"},
         ],
-        temperature=0,
+        temperature=0.6,
+        extra_body={"thinking": {"type": "disabled"}},
     )
     content = response.choices[0].message.content.strip()
     match = re.search(r"\{[\s\S]*\}", content)
@@ -121,7 +125,7 @@ def build_template(parsed_json):
             if val is not None:
                 tpl["margins"][key] = Cm(float(val))
 
-    for role in ("title", "heading1", "heading2", "heading3", "body"):
+    for role in ("title", "heading1", "heading2", "heading3", "body", "caption", "reference"):
         elem = parsed_json.get(role)
         if not elem:
             continue
@@ -135,12 +139,20 @@ def build_template(parsed_json):
         line_spacing = _parse_line_spacing(elem.get("line_spacing", 1.5))
 
         indent = elem.get("first_line_indent")
-        indent = int(indent) if indent is not None else (2 if role == "body" else 0)
+        if indent is not None:
+            indent = int(indent)
+        elif role == "body":
+            indent = 2
+        else:
+            indent = 0
+
+        hanging = elem.get("hanging_indent")
+        hanging = int(hanging) if hanging else 0
 
         space_before = elem.get("space_before", 0)
         space_after = elem.get("space_after", 0)
 
-        tpl[role] = {
+        role_cfg = {
             "font_cn": elem.get("font_cn", "宋体"),
             "font_en": elem.get("font_en", "Times New Roman"),
             "size": Pt(size_pt),
@@ -151,6 +163,9 @@ def build_template(parsed_json):
             "space_before": Pt(float(space_before)) if space_before else Pt(0),
             "space_after": Pt(float(space_after)) if space_after else Pt(0),
         }
+        if hanging > 0:
+            role_cfg["hanging_indent"] = hanging
+        tpl[role] = role_cfg
 
     if "table" not in tpl:
         body_cfg = tpl.get("body", {})
@@ -159,6 +174,33 @@ def build_template(parsed_json):
             "font_en": body_cfg.get("font_en", "Times New Roman"),
             "size": Pt(FONT_SIZE_MAP.get("五号", 10.5)),
             "three_line": True,
+        }
+
+    if "caption" not in tpl:
+        body_cfg = tpl.get("body", {})
+        tpl["caption"] = {
+            "font_cn": body_cfg.get("font_cn", "宋体"),
+            "font_en": body_cfg.get("font_en", "Times New Roman"),
+            "size": Pt(FONT_SIZE_MAP.get("五号", 10.5)),
+            "bold": False,
+            "alignment": WD_ALIGN_PARAGRAPH.CENTER,
+            "line_spacing": body_cfg.get("line_spacing", 1.5),
+            "first_line_indent": 0,
+            "space_before": Pt(6), "space_after": Pt(6),
+        }
+
+    if "reference" not in tpl:
+        body_cfg = tpl.get("body", {})
+        tpl["reference"] = {
+            "font_cn": body_cfg.get("font_cn", "宋体"),
+            "font_en": body_cfg.get("font_en", "Times New Roman"),
+            "size": Pt(FONT_SIZE_MAP.get("五号", 10.5)),
+            "bold": False,
+            "alignment": WD_ALIGN_PARAGRAPH.JUSTIFY,
+            "line_spacing": body_cfg.get("line_spacing", 1.25),
+            "first_line_indent": 0,
+            "hanging_indent": 2,
+            "space_before": Pt(0), "space_after": Pt(0),
         }
 
     return tpl

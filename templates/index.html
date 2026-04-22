@@ -427,7 +427,7 @@ const parsedBody = document.getElementById('parsedBody');
 let selectedFile = null;
 let customTemplateId = null;
 
-const ROLE_NAMES = { title: '题目', heading1: '一级标题', heading2: '二级标题', heading3: '三级标题', body: '正文' };
+const ROLE_NAMES = { title: '题目', heading1: '一级标题', heading2: '二级标题', heading3: '三级标题', body: '正文', caption: '图表标题', reference: '参考文献' };
 
 document.querySelectorAll('.template-card').forEach(card => {
   card.addEventListener('click', () => {
@@ -535,6 +535,8 @@ btnFormat.addEventListener('click', async () => {
   btnFormat.classList.add('loading');
   btnFormat.querySelector('.btn-text').textContent = '排版中…';
   hideError(); resultCard.classList.remove('show');
+  const oldReport = statsGrid.parentElement.querySelector('.parsed-table');
+  if (oldReport) oldReport.closest('div').remove();
 
   const formData = new FormData();
   formData.append('file', selectedFile);
@@ -549,13 +551,35 @@ btnFormat.addEventListener('click', async () => {
     if (!res.ok) { showError(data.error || '未知错误'); return; }
 
     const c = data.changes;
-    const processed = (c.title||0) + (c.heading1||0) + (c.heading2||0) + (c.heading3||0) + (c.body||0);
+    const processed = (c.title||0) + (c.heading1||0) + (c.heading2||0) + (c.heading3||0) + (c.body||0) + (c.caption||0) + (c.reference||0);
     const skipped = c.skipped || 0;
     statsGrid.innerHTML = `
       <div class="stat-item"><div class="stat-num">${data.total_paragraphs}</div><div class="stat-label">总段落数</div></div>
       <div class="stat-item"><div class="stat-num">${skipped}</div><div class="stat-label">前置页保留</div></div>
       <div class="stat-item"><div class="stat-num">${processed}</div><div class="stat-label">已格式化</div></div>
     `;
+
+    let reportHTML = '';
+    if (data.report && Object.keys(data.report).length > 0) {
+      reportHTML = `<div style="margin-top:18px"><h4 style="color:#fff;margin-bottom:10px;font-size:15px;">格式检测报告</h4>
+        <table class="parsed-table"><thead><tr>
+          <th>元素</th><th>数量</th><th>字体</th><th>字号</th><th>加粗</th><th>对齐</th><th>行距</th>
+        </tr></thead><tbody>`;
+      for (const [role, info] of Object.entries(data.report)) {
+        reportHTML += `<tr>
+          <td>${info.label || role}</td>
+          <td>${info.count}</td>
+          <td>${info.font}</td>
+          <td>${info.size}</td>
+          <td>${info.bold ? '是' : '否'}</td>
+          <td>${info.alignment}</td>
+          <td>${info.line_spacing}</td>
+        </tr>`;
+      }
+      reportHTML += '</tbody></table></div>';
+    }
+    statsGrid.insertAdjacentHTML('afterend', reportHTML);
+
     btnDownload.href = `/download/${data.file_id}/${encodeURIComponent(data.output_name)}`;
     resultCard.classList.add('show');
   } catch (e) {
